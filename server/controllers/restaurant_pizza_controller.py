@@ -1,52 +1,39 @@
-from flask import Blueprint, jsonify, request
-from server.models import RestaurantPizza, Restaurant, Pizza, db
+from flask import Blueprint, request, jsonify
+from server import db
+from server.models.restaurant_pizza import RestaurantPizza
+from server.models.pizza import Pizza
+from server.models.restaurant import Restaurant
 
-restaurant_pizzas_bp = Blueprint('restaurant_pizzas', __name__)
+restaurant_pizza_bp = Blueprint('restaurant_pizzas', __name__, url_prefix='/restaurant_pizzas')
 
-@restaurant_pizzas_bp.route('/restaurant_pizzas', methods=['POST'])
+@restaurant_pizza_bp.route('', methods=['POST'])
 def create_restaurant_pizza():
     data = request.get_json()
-    
-    try:
-        price = data['price']
-        pizza_id = data['pizza_id']
-        restaurant_id = data['restaurant_id']
-        
-        if not (1 <= price <= 30):
-            raise ValueError("Price must be between 1 and 30")
-            
-        restaurant_pizza = RestaurantPizza(
-            price=price,
-            pizza_id=pizza_id,
-            restaurant_id=restaurant_id
-        )
-        
-        db.session.add(restaurant_pizza)
-        db.session.commit()
-        
-        pizza = Pizza.query.get(pizza_id)
-        restaurant = Restaurant.query.get(restaurant_id)
-        
-        return jsonify({
-            'id': restaurant_pizza.id,
-            'price': restaurant_pizza.price,
-            'pizza_id': restaurant_pizza.pizza_id,
-            'restaurant_id': restaurant_pizza.restaurant_id,
-            'pizza': {
-                'id': pizza.id,
-                'name': pizza.name,
-                'ingredients': pizza.ingredients
-            },
-            'restaurant': {
-                'id': restaurant.id,
-                'name': restaurant.name,
-                'address': restaurant.address
-            }
-        }), 201
-        
-    except ValueError as e:
-        return jsonify({'errors': [str(e)]}), 400
-    except KeyError:
-        return jsonify({'errors': ['Missing required fields']}), 400
-    except Exception:
-        return jsonify({'errors': ['Validation error']}), 400
+    price = data.get("price")
+    pizza_id = data.get("pizza_id")
+    restaurant_id = data.get("restaurant_id")
+
+    rp = RestaurantPizza(price=price, pizza_id=pizza_id, restaurant_id=restaurant_id)
+    errors = rp.validate()
+    if errors:
+        return jsonify({"errors": errors}), 400
+
+    db.session.add(rp)
+    db.session.commit()
+
+    return jsonify({
+        "id": rp.id,
+        "price": rp.price,
+        "pizza_id": rp.pizza_id,
+        "restaurant_id": rp.restaurant_id,
+        "pizza": {
+            "id": rp.pizza.id,
+            "name": rp.pizza.name,
+            "ingredients": rp.pizza.ingredients
+        },
+        "restaurant": {
+            "id": rp.restaurant.id,
+            "name": rp.restaurant.name,
+            "address": rp.restaurant.address
+        }
+    }), 201
